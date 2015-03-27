@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+		<title>Reversi</title>
+		<style>
+			#c
+			{
+				background-color: #000000;
+			}
+			
+			.modalDialog {
+				position: fixed;
+				font-family: Arial, Helvetica, sans-serif;
+				top: 0;
+				right: 0;
+				bottom: 0;
+				left: 0;
+				background: rgba(0,0,0,0.8);
+				z-index: 99999;
+				opacity:0;
+				-webkit-transition: opacity 400ms ease-in;
+				-moz-transition: opacity 400ms ease-in;
+				transition: opacity 400ms ease-in;
+				pointer-events: none;
+			}
+		
+			.modalDialog:target {
+				opacity:1;
+				pointer-events: auto;
+			}
+		
+			.modalDialog > div {
+				width: 400px;
+				position: relative;
+				margin: 10% auto;
+				padding: 5px 20px 13px 20px;
+				border-radius: 10px;
+				background: #fff;
+				background: -moz-linear-gradient(#fff, #999);
+				background: -webkit-linear-gradient(#fff, #999);
+				background: -o-linear-gradient(#fff, #999);
+			}
+		
+			.close {
+				background: #606061;
+				color: #FFFFFF;
+				line-height: 25px;
+				position: absolute;
+				right: -12px;
+				text-align: center;
+				top: -10px;
+				width: 24px;
+				text-decoration: none;
+				font-weight: bold;
+				-webkit-border-radius: 12px;
+				-moz-border-radius: 12px;
+				border-radius: 12px;
+				-moz-box-shadow: 1px 1px 3px #000;
+				-webkit-box-shadow: 1px 1px 3px #000;
+				box-shadow: 1px 1px 3px #000;
+			}
+		
+			.close:hover { background: #00d9ff; }
+	
+			.center {
+	    		margin-left: auto;
+    			margin-right: auto;
+			}
+			
+			input:
+			form {
+				border: 1px solid black;
+				-moz-border-radius: 5px;
+				-webkit-border-radius: 5px;
+				border-radius: 5px;
+				padding: 20px;
+			}
+			
+			form fieldset {
+				border: none;
+				margin-bottom: 10px;
+			}
+			form fieldset:last-of-type {
+				margin-bottom: 0;
+			}
+
+			form legend {
+				font-size: 24px;
+				font-weight: bold;
+				padding-bottom: 10px;
+				text-shadow: 0 1px 1px #c0d576;
+			}
+
+			input[type=radio], input[type=checkbox] {
+				margin-left: 15px;
+			}
+			
+			input[type=submit], input[type=reset] {
+				margin-bottom: 5px; padding: 8px; 
+				font-weight: bold; color: #fff; text-shadow: 0 -1px 1px #306d1b;
+				border-radius: 5px;
+			}
+			
+			input[type=submit] {
+				background-color: #306d1b; border: 1px solid #306d1b;
+				background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #61ce3b), color-stop(1, #306d1b));
+				background-image: -webkit-linear-gradient(top, #61ce3b, #306d1b);
+				background-image: -moz-linear-gradient(top, #61ce3b, #306d1b);
+				background-image: -o-linear-gradient(top, #61ce3b, #306d1b);
+				background-image: -ms-linear-gradient(top, #61ce3b, #306d1b);
+				background-image: linear-gradient(to bottom, #61ce3b, #306d1b);
+			}
+			
+			input[type=reset] {
+				background-color: #ad390c; border: 1px solid #ad390c;
+				text-decoration: none;
+				background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0, #ec4a0b), color-stop(1, #ad390c));
+				background-image: -webkit-linear-gradient(top, #ec4a0b, #ad390c);
+				background-image: -moz-linear-gradient(top, #ec4a0b, #ad390c);
+				background-image: -o-linear-gradient(top, #ec4a0b, #ad390c);
+				background-image: -ms-linear-gradient(top, #ec4a0b, #ad390c);
+				background-image: linear-gradient(to bottom, #ec4a0b, #ad390c);
+			}
+		</style>
+	</head>
+	<body class="game">
+		<div style="width: 410px">
+			<div style="float: left">
+				<a href="#help"><img src="help.png" alt="Help" style="width: 32px"></img></a>
+			</div>
+			<div style="float: right">
+				<a href="#settings"><img src="settings.png" alt="Settings" style="width: 32px"></img></a>
+			</div>
+		</div>
+		<div style="width: 410px">
+			<canvas id="c" width="409" height="460"></canvas>
+		</div>
+		<div id="gameover" class="modalDialog">
+			<div>
+				<a href="#close" title="Close" class="close">X</a>
+				<form name="playAgain">
+					<h2 id="result_text"></h2>
+					<p>Do you want to play again?</p>
+					<p class="center">
+						<input type="submit" value="Yes">
+						<input type="reset" value="No">
+					</p>
+				</form>
+			</div>
+		</div>
+		<div id="help" class="modalDialog">
+			<div>
+				<a href="#close" title="Close" class="close">X</a>
+				<h2>Reversi Help</h2>
+			    <p>Reversi is played on an 8x8 board. The two players each have 32 pieces, which are white on one side and black on the other.</p> 
+				<p>The goal to earn as many pieces as possible by flipping/capturing your opponent's pieces.</p>
+				<p>Each turn, a player must place a disc of his color on one of the empty squares, adjacent to an opponent's disc. For this to be a valid move, he must flank one or more of his opponent's discs between the disc played and another disc of his color already on the board.  He then flips to his color all the discs which were flanked. Note that discs can be flanked in all eight directions.</p>
+				<h3>Rules</h3>
+				<ol>
+					<li>The black player always goes first.</li>
+					<li>Corner pieces can never be flipped once set.</li>
+					<li>If one player can't move, the other player gets to keep making moves until first player can play a move.</li>
+					<li>If neither player can move, the game ends and the current score determines winner.  There can be tie games if scores are same.</li>
+					<li>If one player runs out of squares on the board, they automatically lose.</li>
+				</ol>
+			</div>
+		</div>
+		<div id="settings" class="modalDialog">
+			<div>
+				<a href="#close" title="Close" class="close">X</a>
+				<form name="settings">
+					<fieldset>
+						<h2>Game Settings</h2>
+					    <p style="font-weight: bold">Difficulty:</p>
+						<p><input id="difficulty_easy" name="difficulty" type="radio" value="easy" checked><label for="difficulty_easy">Easy<label></p>
+						<p><input id="difficulty_normal" name="difficulty" type="radio" value="normal"><label for="difficulty_normal">Normal<label></p>
+					    <p style="font-weight: bold">Preferred Color:</p>
+						<p><input id="color_choice_random" name="color_choice" type="radio" value="random" checked><label for="color_choice_random">Random<label></p>
+						<p><input id="color_choice_black" name="color_choice" type="radio" value="black"><label for="color_choice_black">Black<label></p>
+						<p><input id="color_choice_white" name="color_choice" type="radio" value="white"><label for="color_choice_white">White<label></p>
+						<p>
+							<label><input id="show_hints" type="checkbox" name="show_hints" value="show" checked>Show Move Hints</label>
+						</p>
+						<p>
+							<input type="submit" value="Save">
+							<input type="reset" value="Cancel">
+						</p>
+					</fieldset>
+				</form>
+			</div>
+		</div>
+
+		<script src="sji.js"></script>
+		<script src="settings.js"></script>
+		<script src="easeljs-0.8.0.min.js"></script>
+		<script src="game.js"></script>
+	</body>
+</html>
