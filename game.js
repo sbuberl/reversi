@@ -1,6 +1,4 @@
 (function() {
-    var stage = null;
-
     var Piece = {
         none: "#0BA31C",
         white: "#FFFFFF",
@@ -13,6 +11,8 @@
         init: function() {
             this.width = this.canvas.width;
             this.height = this.canvas.height;
+            Graphics.init(this.canvas);
+            Ctrl.init(this.canvas);
             Grid.init();
             this.blackPlayer = new Player(Piece.black);
             this.whitePlayer = new Player(Piece.white);
@@ -184,43 +184,55 @@
         height : 51,
         
         draw : function() {
-            this.background = new createjs.Shape();
-            this.background.graphics.beginFill("#0BA31C").drawRect(1, 1, 407, 50);
-            
-            this.blackPiece = new createjs.Shape();
-            this.blackPiece.graphics.beginStroke("black").beginFill("black").arc(30, 25, 15, 0, Math.PI * 2, false);
-            
-            this.whitePiece = new createjs.Shape();
-            this.whitePiece.graphics.beginStroke("black").beginFill("white").arc(350, 25, 15, 0, Math.PI * 2, false);
-            
-            stage.addChild(this.background, this.blackPiece, this.whitePiece);
+            Graphics.fillEmptyBlock(1, 1, 407, 50);
+            Graphics.drawPiece(30, 25, 15, "black");
+            Graphics.drawPiece(350, 25, 15, "white");
         },
         
         showScores : function(blackScore, whiteScore) {
-            this.removeOldText();
-            this.blackText = this.buildScoreText(blackScore, 60);
-            this.whiteText = this.buildScoreText(whiteScore, 380);
-            stage.update();
+            Graphics.fillEmptyBlock(60, 15, 25, 20);
+            Graphics.fillEmptyBlock(380, 15, 25, 20);
+            Graphics.showScore(blackScore, 60);
+            Graphics.showScore(whiteScore, 380);
+        }
+    };
+    
+    var Graphics = {
+        init : function(canvas) {
+            this.context = canvas.getContext("2d");
         },
         
-        buildScoreText : function(score, x) {
-            var text = new createjs.Text(score, "20px Arial", "black");
-            text.x = x;
-            text.y = 15;
-            
-            stage.addChild(text);
-            return text;
+        fillEmptyBlock : function(x, y, width, height) {
+            this.context.fillStyle = "#0BA31C";
+            this.context.fillRect(x, y, width, height);
         },
         
-        removeOldText : function() {
-            if(this.blackText != null) {
-                stage.removeChild(this.blackText);
-                this.blackText = null;
-            }
-            if(this.whiteText != null) {
-                stage.removeChild(this.whiteText);
-                this.whiteText = null;
-            }
+        drawPiece : function(x, y, radius, color) {
+            this.context.beginPath();
+            this.context.strokeStyle = "#000000";
+            this.context.arc(x, y, radius, 0, Math.PI * 2, false);
+            this.context.fillStyle = color;
+            this.context.fill();
+            this.context.stroke();
+            this.context.closePath();
+        },
+        
+         drawHint : function(x, y) {
+            this.context.beginPath();
+            this.context.strokeStyle = "#000000";
+            var pieceX = x + 25;
+            var pieceY = y + 25;
+            this.context.arc(pieceX, pieceY, 5, 0, Math.PI * 2, false);
+            this.context.fillStyle = "#00FFFF";
+            this.context.fill();
+            this.context.stroke();
+            this.context.closePath();
+        },
+        
+        showScore : function(score, x) {
+    		this.context.font = "20px Arial";
+			this.context.fillStyle= "black";
+			this.context.fillText(score, x, 30);
         }
     };
 
@@ -232,13 +244,8 @@
         this.piece = Piece.none;
     }
 
-    Cell.prototype.drawRect  = function(parent) {
-        if(!this.rectangle) {
-            this.rectangle = new createjs.Shape();
-            this.rectangle.graphics.beginFill("#0BA31C").drawRect(this.x, this.y, 50, 50);
-            this.rectangle.on("click", this.onClick, this);
-            parent.addChild(this.rectangle);
-        }
+    Cell.prototype.drawRect  = function() {
+        Graphics.fillEmptyBlock(this.x, this.y, 50, 50);
     };
 
     Cell.prototype.addPiece = function(piece) {
@@ -247,66 +254,25 @@
             if (index != -1) {
                 Grid.emptyCells.splice(index, 1);
             }
-            this.rectangle.off("click", this.onClick);
         }
         
         this.piece = piece;
-        this.pieceShape = new createjs.Shape();
-
-        var pieceX = this.x + 25;
-        var pieceY = this.y + 25;
-        this.pieceShape.graphics.beginStroke("black").beginFill(piece).arc(pieceX, pieceY, 23, 0, Math.PI * 2, false);
-        this.rectangle.parent.addChild(this.pieceShape);
-        stage.update();
-    };
-    
-    Cell.prototype.flip = function(newPiece) {
-        if (this.piece != Piece.none) {
-            this.removePiece();
-            this.addPiece(newPiece);
-        }
+        Graphics.drawPiece(this.x + 25, this.y + 25, 23, piece);
     };
     
     Cell.prototype.addHint = function() {
-        this.hintShape = new createjs.Shape();
-        var pieceX = this.x + 25;
-        var pieceY = this.y + 25;
-        this.hintShape.graphics.beginStroke("black").beginFill("#00FFFF").arc(pieceX, pieceY, 5, 0, Math.PI * 2, false);
-        this.rectangle.parent.addChild(this.hintShape);
-        stage.update();
+        Graphics.drawHint(this.x, this.y);
     };
 
     Cell.prototype.removeHint = function() {
-        if(this.hintShape != null) {
-            this.hintShape.parent.removeChild(this.hintShape);
-            this.hintShape = null;
-            stage.update();
+        if(this.piece == Piece.none) {
+            this.drawRect();
         }
-    };
-    
-    Cell.prototype.removePiece = function() {
-        if(this.pieceShape != null) {
-            this.pieceShape.parent.removeChild(this.pieceShape);
-            this.pieceShape = null;
-            stage.update();
-        }
-
     };
     
     Cell.prototype.clear = function() {
         this.piece = Piece.none;
-        this.removePiece();
-        this.removeHint();
-    };
-    
-    Cell.prototype.onClick = function(event) {
-        if (Game.isUserTurn && this.piece == Piece.none) {
-            var user = Game.user;
-            var move = user.getValidMove(this);
-            if(move !== null) {
-                user.play(move);
-            }
-        }
+        Graphics.fillEmptyBlock(this.x, this.y, 50, 50);
     };
 
     function MoveResult(cell, value, flippedLines) {
@@ -423,7 +389,7 @@
                 current = Grid.cells[row][col];
                 var currentPiece = current.piece;
                 if (currentPiece != this.piece && currentPiece != Piece.none) {
-                    current.flip(this.piece);
+                    current.addPiece(this.piece);
                     window.setTimeout(this.flipLine.bind(this), 75, row + rowDelta, col + colDelta, rowDelta, colDelta);
                     return;
                 }
@@ -464,12 +430,9 @@
         },
 
         draw: function() {
-            var container = new createjs.Container();
             this.processCells(function(cell) {
-                cell.drawRect(container);
+                cell.drawRect();
             });
-            
-            stage.addChild(container);
         },
         
         reset : function() {
@@ -494,6 +457,33 @@
         addPiece: function(row, col, piece) {
             var cell = Grid.cells[row][col];
             cell.addPiece(piece);
+        }
+    };
+    
+    var Ctrl = {        
+        init : function(canvas) {
+            canvas.addEventListener("click", this.cellClicked, true);
+        },
+
+        cellClicked : function(event) {
+            if(Game.isUserTurn) {
+                var canvas = Game.canvas;
+                var gridX = event.pageX - canvas.offsetLeft;
+                var gridY = event.pageY - canvas.offsetTop - Scoreboard.height;
+                if(gridY >= 0) {
+                    var row = Math.floor(gridY/51);
+                    var col = Math.floor(gridX/51);
+                    var cell = Grid.cells[row][col];    
+                    if (cell.piece == Piece.none) {
+                        var user = Game.user;
+                        var move = user.getValidMove(cell);
+                        if(move !== null) {
+                            user.play(move);
+                        }
+                    }
+                }
+                
+            }
         }
     };
 
@@ -564,9 +554,6 @@
     });
 
     window.onload = function() {
-        stage = new createjs.Stage('c');
-        stage.enableMouseOver();
-
         Game.init();
         
         document.forms.playAgain.addEventListener("submit", function(event) {
@@ -578,7 +565,5 @@
             }, false);
             
         Game.start();
-
-        createjs.Ticker.on("tick", stage);
     };
 }());
