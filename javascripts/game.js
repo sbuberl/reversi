@@ -89,7 +89,7 @@
 
             var hasUserMoves = this.user.availableMoves.length != 0;
             var hasAiMoves = this.ai.availableMoves.length != 0;
-            if ((hasUserMoves|| hasAiMoves) || (blackScore != 0 && whiteScore != 0 && blackScore + whiteScore != 64)) {
+            if (hasUserMoves|| hasAiMoves) {
                 if(!hasUserMoves) {
                     this.isUserTurn = false;
                 } else if(!hasAiMoves) {
