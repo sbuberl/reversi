@@ -648,15 +648,6 @@
             return bestMove;
         }
     });
-                if(weight > maxWeight) {
-                    maxWeight = weight;
-                    bestMove = move;
-                }
-            }
-
-            return bestMove;
-        }
-    });
 
     window.onload = function() {
         Game.init();
