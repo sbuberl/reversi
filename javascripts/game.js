@@ -84,11 +84,8 @@
             this.fixScores();
             this.buildMoveLists();
 
-            var blackScore = this.blackPlayer.points;
-            var whiteScore = this.whitePlayer.points;
-
-            var hasUserMoves = this.user.availableMoves.length != 0;
-            var hasAiMoves = this.ai.availableMoves.length != 0;
+            var hasUserMoves = this.user.availableMoves().length != 0;
+            var hasAiMoves = this.ai.availableMoves().length != 0;
             if (hasUserMoves|| hasAiMoves) {
                 if(!hasUserMoves) {
                     this.isUserTurn = false;
@@ -128,14 +125,13 @@
             var blackScore = 0;
             var whiteScore = 0;
 
-            var cells = Grid.cells;
+            var values = Grid.board.values;
             for (var row = 0; row < 8; ++row) {
                 for (var col = 0; col < 8; ++col) {
-                    var cell = cells[row][col];
-                    var cellPiece = cell.piece;
-                    if(cellPiece == Piece.black) {
+                    var piece = values[row][col];
+                    if(piece == Piece.black) {
                         ++blackScore;
-                    } else  if(cellPiece == Piece.white) {
+                    } else  if(piece == Piece.white) {
                         ++whiteScore;
                     }
                 }
@@ -153,8 +149,7 @@
         },
         
         buildMoveLists : function() {
-            this.user.buildMoveList(this.defaultEvaluator);
-            this.ai.buildMoveList(this.behavior.evaluator);
+            Grid.board.buildMoveList(this.defaultEvaluator, this.behavior.evaluator);
         },
         
         defaultEvaluator : function(row, column) {
@@ -162,20 +157,22 @@
         },
         
         addHints : function() {
-            var userMoves = this.user.availableMoves;
+            var userMoves = this.user.availableMoves();
             var userMoveCount = userMoves.length;
             for (var i = 0; i < userMoveCount; ++i) {
                 var move = userMoves[i];
-                move.cell.addHint();
+                var cell = Grid.cells[move.row][move.column];
+                cell.addHint();
             }
         },
         
         removeHints : function() {
-            var userMoves = this.user.availableMoves;
+            var userMoves = this.user.availableMoves();
             var userMoveCount = userMoves.length;
             for (var i = 0; i < userMoveCount; ++i) {
                 var move = userMoves[i];
-                move.cell.removeHint();
+                var cell = Grid.cells[move.row][move.column];
+                cell.removeHint();
             }
         },
     };
@@ -241,7 +238,7 @@
         this.column = col;
         this.x = x;
         this.y = y;
-        this.piece = Piece.none;
+        this.hasHint = false;
     }
 
     Cell.prototype.drawRect  = function() {
@@ -249,29 +246,25 @@
     };
 
     Cell.prototype.addPiece = function(piece) {
-        if (this.piece == Piece.none) {
-            var index = Grid.emptyCells.indexOf(this);
-            if (index != -1) {
-                Grid.emptyCells.splice(index, 1);
-            }
-        }
-        
-        this.piece = piece;
+        this.hasHint = false;
+        Grid.board.setValue(this.row, this.column, piece);
         Graphics.drawPiece(this.x + 25, this.y + 25, 23, piece);
     };
     
     Cell.prototype.addHint = function() {
         Graphics.drawHint(this.x, this.y);
+        this.hasHint = true;
     };
 
     Cell.prototype.removeHint = function() {
-        if(this.piece == Piece.none) {
+        if(this.hasHint) {
             this.drawRect();
+            this.hasHint = false;
         }
     };
     
     Cell.prototype.clear = function() {
-        this.piece = Piece.none;
+        Grid.board.setValue(this.row, this.column, Piece.none);
         Graphics.fillEmptyBlock(this.x, this.y, 50, 50);
     };
 
@@ -285,95 +278,48 @@
         init: function(piece) {
             this.piece = piece;
             this.points = 2;
-            this.availableMoves = [];
+            if(piece == Piece.black) {
+                this.availableMoves = function() {
+                    return Grid.board.blackMoves;
+                };
+            } else {
+                this.availableMoves = function() {
+                    return Grid.board.whiteMoves;
+                };
+            }
         },
 
         play: function(move) {
             if(!move) {
                 return;
             }
-            move.cell.addPiece(this.piece);
+            var cell = Grid.cells[move.row][move.column];
+            cell.addPiece(this.piece);
             this.flipAdjacent(move, 0);
         },
-
-        buildMoveList : function(evaluator) {
-            this.availableMoves = [];
-            var emptyCells = Grid.emptyCells;
-            var emptyCount = emptyCells.length;
-            for (var i = 0; i < emptyCount; ++i) {
-                var empty = emptyCells[i];
-                var move = this.buildMove(empty, evaluator);
-                if(move !== null) {
-                    this.availableMoves.push(move);
-                }
-            }
-        },
         
-        getValidMove : function(cell) {
-            var movesCount = this.availableMoves.length;
+        getValidMove : function(row, column) {
+            var moves = this.availableMoves();
+            var movesCount = moves.length;
             for (var i = 0; i < movesCount; ++i) {
-                var move = this.availableMoves[i];
-                if(move.cell == cell) {
+                var move = moves[i];
+                if(move.row == row && move.column == column) {
                     return move;
                 }
             }
             return null;
         },
-
-        buildMove: function(cell, evaluator) {
-            var value = 0;
-            var flippedLines = [];
-            for (var d = 0; d < 8; d++) {
-                var direction = this.getDirection(d);
-                var result = this.buildLine(cell, evaluator, direction.rowDelta, direction.colDelta);
-                if(result !== null) {
-                    value += result;
-                    flippedLines.push(d);
-                }
-            }
-            
-            if(flippedLines.length > 0) {
-                return new MoveResult(cell, value, flippedLines);
-            } else {
-                return null;
-            }
-        },
-
-        buildLine: function(cell, evaluator, rowDelta, colDelta) {
-            var current;
-            var stopCol = colDelta > 0 ? 8 : -1;
-            var stopRow = rowDelta > 0 ? 8 : -1;
-            var oppositeFound = false;
-            var value = 0;
-
-            var cells = Grid.cells;
-            for (var row = cell.row + rowDelta, col = cell.column + colDelta; row != stopRow && col != stopCol; row += rowDelta, col += colDelta) {
-                current = cells[row][col];
-                var currentPiece = current.piece;
-                if (currentPiece == Piece.none) {
-                    break;
-                } else if (currentPiece != this.piece) {
-                    oppositeFound = true;
-                    value += evaluator(current.row, current.column);
-                } else {
-                    return oppositeFound ? value : null;
-                }
-            }
-
-            return null;
-        },
-
+        
         flipAdjacent : function(move, lineIndex)
         {
             var flippedLines = move.flippedLines;
             if(lineIndex < flippedLines.length)
             {
                 var line = flippedLines[lineIndex];
-                var direction = this.getDirection(line);
+                var direction = Board.getDirection(line);
                 var rowDelta = direction.rowDelta;
                 var colDelta = direction.colDelta;
-                var cell = move.cell;
-                this.flipLine(cell.row + rowDelta, cell.column + colDelta, rowDelta, colDelta);
+                this.flipLine(move.row + rowDelta, move.column + colDelta, rowDelta, colDelta);
                 window.setTimeout(this.flipAdjacent.bind(this), 75, move, lineIndex + 1);
             } else {
                 window.setTimeout(Game.switchTurns.bind(Game), 300);
@@ -386,39 +332,190 @@
             var stopRow = rowDelta > 0 ? 8 : -1;
 
             if (row != stopRow && col != stopCol) {
-                current = Grid.cells[row][col];
-                var currentPiece = current.piece;
-                if (currentPiece != this.piece && currentPiece != Piece.none) {
-                    current.addPiece(this.piece);
+                var current = Grid.board.getValue(row, col);
+                if (current != this.piece && current != Piece.none) {
+                    var currentCell = Grid.cells[row][col];
+                    currentCell.addPiece(this.piece);
                     window.setTimeout(this.flipLine.bind(this), 75, row + rowDelta, col + colDelta, rowDelta, colDelta);
                     return;
                 }
             }
-        },
-
-        getDirection: function() {
-            var directions = [
-                { rowDelta: -1, colDelta: -1 },
-                { rowDelta: -1, colDelta: 0 },
-                { rowDelta: -1, colDelta: 1 },
-                { rowDelta: 0, colDelta: -1 },
-                { rowDelta: 0, colDelta: 1  },
-                { rowDelta: 1, colDelta: -1 },
-                { rowDelta: 1, colDelta: 0 },
-                { rowDelta: 1, colDelta: 1 }
-            ];
-            return function(index) {
-                return directions[index];
-            };
-        }()
+        }
     });
+    
+    function BoardCell(row, column) {
+        this.row = row;
+        this.column = column;
+    }   
+    
+    function EvaluateResult(row, column, board, value, flippedLines) {
+        this.row = row;
+        this.column = column;
+        this.board = board;
+        this.value = value;
+        this.flippedLines = flippedLines;
+    }    
 
+    function Board(initialize) {
+        initialize = typeof initialize !== 'undefined' ?  initialize : true;
+        if(initialize) {
+            this.values = [];
+            this.emptyCells = [];
+            this.blackMoves = [];
+            this.whiteMoves = [];
+            this.userMoves = [];
+            this.aiMoves = [];
+            
+            for (var row = 0; row < 8; row += 1) {
+                this.values[row] = [];
+                for (var col = 0; col < 8; col += 1) {
+                    this.values[row][col] = Piece.none;
+                    this.emptyCells.push(new BoardCell(row, col));
+                }
+            }
+        }
+    }
+    
+    Board.prototype.clone = function()
+    {
+        var newBoard = new Board(false);
+        var newValues = [];
+        for (var i = 0; i < this.values.length; i++)
+            newValues[i] = this.values[i].slice();
+        newBoard.values = newValues;
+        newBoard.emptyCells = this.emptyCells.slice();
+        newBoard.userMoves = this.userMoves.slice();
+        newBoard.aiMoves = this.aiMoves.slice();
+        if(Game.user.piece == Piece.black) {
+            newBoard.blackMoves = newBoard.userMoves;
+            newBoard.whiteMoves = newBoard.aiMoves;
+        } else {
+            newBoard.blackMoves = newBoard.aiMoves;
+            newBoard.whiteMoves = newBoard.userMoves;
+        }
+        
+        return newBoard;
+    };
+    
+    Board.prototype.getValue = function(row, col) {
+        return this.values[row][col];
+    };
+    
+    Board.prototype.setValue = function(row, col, piece) {
+        this.values[row][col] = piece;
+        this.removeEmpty(row, col);
+    };
+    
+    Board.prototype.removeEmpty = function(row, col) {
+        var emptyCells = this.emptyCells;
+        var emptyCount = emptyCells.length;
+        for (var i = 0; i < emptyCount; ++i) {
+            var empty = emptyCells[i];
+            if(empty.row == row && empty.column == col) {
+                emptyCells.splice(i, 1);
+                return;
+            }
+        }
+    };
+    
+    Board.prototype.evaluate = function(row, col, piece, evaluator) {
+        var tempBoard = this.clone();
+        var value = 0;
+        var flippedLines = [];
+        for (var d = 0; d < 8; d++) {
+            var direction = Board.getDirection(d);
+            var result = tempBoard.evaluateLine(row, col, piece, evaluator, direction.rowDelta, direction.colDelta);
+            if(result !== null) {
+                value += result;
+                flippedLines.push(d);
+            }
+        }
+        
+        if(flippedLines.length > 0) {
+            tempBoard.setValue(row, col, piece);
+            return new EvaluateResult(row, col, tempBoard, value, flippedLines);
+        } else {
+            return null;
+        }
+    };
+
+    Board.prototype.evaluateLine = function(cellRow, cellColumn, piece, evaluator, rowDelta, colDelta) {
+        var current;
+        var stopCol = colDelta > 0 ? 8 : -1;
+        var stopRow = rowDelta > 0 ? 8 : -1;
+        var oppositeFound = false;
+        var value = 0;
+
+        var cells = this.values;
+        for (var row = cellRow + rowDelta, col = cellColumn + colDelta; row != stopRow && col != stopCol; row += rowDelta, col += colDelta) {
+            current = cells[row][col];
+            if (current == Piece.none) {
+                break;
+            } else if (current != piece) {
+                oppositeFound = true;
+                value += evaluator(row, col);
+                this.values[row][col] = piece;
+            } else {
+                return oppositeFound ? value : null;
+            }
+        }
+
+        return null;
+    };
+    
+    Board.prototype.buildMoveList = function(userEval, aiEval) {
+        this.userMoves = [];
+        this.aiMoves = [];
+        var userPiece = Game.user.piece;
+        var aiPiece = Game.ai.piece;
+        
+        var emptyCells = this.emptyCells;
+        var emptyCount = emptyCells.length;
+        for (var i = 0; i < emptyCount; ++i) {
+            var empty = emptyCells[i];
+            this.checkMove(empty, userPiece, this.userMoves, userEval);
+            this.checkMove(empty, aiPiece, this.aiMoves, aiEval);
+        }
+        
+        if(Game.user.piece == Piece.black) {
+            this.blackMoves = this.userMoves;
+            this.whiteMoves = this.aiMoves;
+        } else {
+            this.blackMoves = this.aiMoves;
+            this.whiteMoves = this.userMoves;
+        }
+    };
+    
+    Board.prototype.checkMove = function(empty, color, moveList, evaluator) {
+        var move = this.evaluate(empty.row, empty.column, color, evaluator);
+        if(move !== null) {
+            moveList.push(move);
+        }
+    };
+    
+    Board.getDirection = function() {
+        var directions = [
+            { rowDelta: -1, colDelta: -1 },
+            { rowDelta: -1, colDelta: 0 },
+            { rowDelta: -1, colDelta: 1 },
+            { rowDelta: 0, colDelta: -1 },
+            { rowDelta: 0, colDelta: 1  },
+            { rowDelta: 1, colDelta: -1 },
+            { rowDelta: 1, colDelta: 0 },
+            { rowDelta: 1, colDelta: 1 }
+        ];
+        return function(index) {
+            return directions[index];
+        };
+    }();
+    
     var Grid = {
 
         init: function() {
             var width = Game.width;
             var height = Game.height;
             this.cells = [];
+            this.board = new Board();
             this.emptyCells = [];
             for (var y = Scoreboard.height + 1, row = 0; y < height; y += 51, row += 1) {
                 this.cells[row] = [];
@@ -454,7 +551,8 @@
             }
         },
 
-        addPiece: function(row, col, piece) {
+        addPiece: function(row, col, piece) 
+        {
             var cell = Grid.cells[row][col];
             cell.addPiece(piece);
         }
@@ -472,11 +570,10 @@
                 var gridY = event.pageY - canvas.offsetTop - Scoreboard.height;
                 if(gridY >= 0) {
                     var row = Math.floor(gridY/51);
-                    var col = Math.floor(gridX/51);
-                    var cell = Grid.cells[row][col];    
-                    if (cell.piece == Piece.none) {
+                    var col = Math.floor(gridX/51);  
+                    if (Grid.board.getValue(row, col) == Piece.none) {
                         var user = Game.user;
-                        var move = user.getValidMove(cell);
+                        var move = user.getValidMove(row, col);
                         if(move !== null) {
                             user.play(move);
                         }
@@ -495,9 +592,8 @@
         chooseMove : function() {},
         
         selectMove: function() {
-            var moves = Game.ai.availableMoves;
+            var moves = Game.ai.availableMoves();
             if(moves.length > 0) {
-                var index = Math.floor(Math.random() * moves.length);
                 return this.chooseMove(moves);
             } else {
                 window.setTimeout(Game.switchTurns.bind(Game), 75);
@@ -542,7 +638,16 @@
             var count = moves.length;
             for (var i = 0; i < count; ++i) {
                 var move = moves[i];
-                var weight = this.getWeight(move.cell.row, move.cell.column) + move.value;
+                var weight = this.getWeight(move.row, move.column) + move.value;
+                if(weight > maxWeight) {
+                    maxWeight = weight;
+                    bestMove = move;
+                }
+            }
+
+            return bestMove;
+        }
+    });
                 if(weight > maxWeight) {
                     maxWeight = weight;
                     bestMove = move;
