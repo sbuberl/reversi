@@ -566,8 +566,21 @@
         cellClicked : function(event) {
             if(Game.isUserTurn) {
                 var canvas = Game.canvas;
-                var gridX = event.pageX - canvas.offsetLeft;
-                var gridY = event.pageY - canvas.offsetTop - Scoreboard.height;
+                var x = 0;
+                var y = 0;
+                if (event.x != undefined && event.y != undefined) {
+                    x = event.x;
+                    y = event.y;
+                }
+                else // Firefox method to get the position
+                {
+                    x = event.clientX + document.body.scrollLeft +
+                        document.documentElement.scrollLeft;
+                    y = event.clientY + document.body.scrollTop +
+                        document.documentElement.scrollTop;
+                }
+                var gridX = x - canvas.offsetLeft;
+                var gridY = y - canvas.offsetTop - Scoreboard.height;
                 if(gridY >= 0) {
                     var row = Math.floor(gridY/51);
                     var col = Math.floor(gridX/51);  
